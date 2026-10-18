@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlanSmith Local Suite - Implementation Planning Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-hidden bg-slate-950 text-slate-100">
+
+  <!-- TOP HEADER & NAVBAR -->
+  <header class="h-16 border-b border-slate-800 bg-slate-900/90 backdrop-blur px-6 flex items-center justify-between shrink-0 z-30">
+    <div class="flex items-center gap-4">
+      <div class="flex items-center gap-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-indigo-500/20">
+          <i class="fa-solid fa-hammer"></i>
+        </div>
+        <div>
+          <h1 class="font-bold text-lg leading-none tracking-wide text-white">PlanSmith <span class="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono border border-amber-500/30">LOCAL</span></h1>
+          <p class="text-xs text-slate-400 mt-0.5">Implementation Planning Studio</p>
+        </div>
+      </div>
+
+      <div class="h-6 w-px bg-slate-800 mx-2"></div>
+
+      <!-- Project Selector -->
+      <div class="flex items-center gap-2">
+        <select id="projectSelect" class="bg-slate-800 text-sm font-medium border border-slate-700 text-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 max-w-xs">
+          <option value="">-- Select Project --</option>
+        </select>
+        <button id="btnNewProject" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-md transition flex items-center gap-1.5">
+          <i class="fa-solid fa-plus"></i> New Project
+        </button>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+      <button data-tab="studio" class="nav-tab active px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <i class="fa-solid fa-comments text-indigo-400"></i> Active Studio
+      </button>
+      <button data-tab="board" class="nav-tab px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <i class="fa-solid fa-columns text-amber-400"></i> Live State Board
+      </button>
+      <button data-tab="vault" class="nav-tab px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <i class="fa-solid fa-vault text-emerald-400"></i> Source Vault
+      </button>
+      <button data-tab="scanner" class="nav-tab px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <i class="fa-brands fa-github text-purple-400"></i> Repo Scanner
+      </button>
+      <button data-tab="exporter" class="nav-tab px-4 py-1.5 rounded-lg text-sm font-medium transition flex items-center gap-2">
+        <i class="fa-solid fa-file-export text-cyan-400"></i> Exporter
+      </button>
+    </nav>
+
+    <!-- System Status Badges -->
+    <div class="flex items-center gap-3">
+      <div id="geminiStatusBadge" class="text-xs px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-300 flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+        <span id="geminiStatusText">AI Loading...</span>
+      </div>
+      <div class="text-xs px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-slate-400 font-mono">
+        <i class="fa-solid fa-wifi text-emerald-400 mr-1"></i> 0.0.0.0:3000
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTENT VIEWS -->
+  <main class="flex-1 overflow-hidden relative">
+
+    <!-- VIEW 1: ACTIVE STUDIO (Chat + Live State Sidebar) -->
+    <section id="view-studio" class="tab-view active h-full flex overflow-hidden">
+      <!-- Left: AI Interviewer Chat -->
+      <div class="flex-1 flex flex-col border-r border-slate-800 bg-slate-950/60">
+        <!-- Chat Header -->
+        <div class="p-4 border-b border-slate-800 bg-slate-900/40 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-sm text-slate-200">Active AI Interviewer</h3>
+              <p class="text-xs text-slate-400" id="chatProjectTitle">Select or create a project to start scoping</p>
+            </div>
+          </div>
+          <button id="btnClearChat" class="text-xs px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded border border-slate-700 transition">
+            <i class="fa-solid fa-trash-can mr-1"></i> Clear History
+          </button>
+        </div>
+
+        <!-- Chat Transcript Container -->
+        <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-4 scroll-smooth">
+          <div class="p-6 text-center text-slate-500 text-sm">
+            Select a project or click <strong>New Project</strong> above to begin your active scoping interview session.
+          </div>
+        </div>
+
+        <!-- Quick Suggestions bar -->
+        <div class="px-4 py-2 bg-slate-900/40 border-t border-slate-800/60 flex items-center gap-2 overflow-x-auto text-xs text-slate-400">
+          <span class="font-semibold text-slate-500 shrink-0">Quick Prompts:</span>
+          <button class="quick-prompt px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/80 shrink-0">Define core tech stack</button>
+          <button class="quick-prompt px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/80 shrink-0">Setup database & schemas</button>
+          <button class="quick-prompt px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/80 shrink-0">Scope 3D print dimensions & materials</button>
+          <button class="quick-prompt px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded border border-slate-700/80 shrink-0">Identify milestone phases</button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form id="chatForm" class="p-4 bg-slate-900/80 border-t border-slate-800 flex gap-2">
+          <input type="text" id="chatInput" placeholder="Describe a decision, requirement, or feature (e.g. 'Use SQLite database for local persistence')" 
+                 class="flex-1 bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder-slate-500">
+          <button type="submit" id="btnSendChat" class="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-indigo-600/20 transition flex items-center gap-2">
+            <span>Send</span> <i class="fa-solid fa-paper-plane text-xs"></i>
+          </button>
+        </form>
+      </div>
+
+      <!-- Right: Live Decision Buckets Mini-Board -->
+      <div class="w-96 flex flex-col bg-slate-900/30 overflow-hidden">
+        <div class="p-4 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i class="fa-solid fa-layer-group text-amber-400 text-sm"></i>
+            <h3 class="font-bold text-sm text-slate-200">Live Decision Tracker</h3>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono" id="miniBoardCount">0 items</span>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-4 space-y-4">
+          <!-- Locked In Mini Bucket -->
+          <div class="bg-slate-900/80 rounded-xl p-3 border border-emerald-500/20">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-lock text-[10px]"></i> Locked In
+              </span>
+              <span id="countLocked" class="text-xs font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">0</span>
+            </div>
+            <div id="miniBucketLocked" class="space-y-2 text-xs"></div>
+          </div>
+
+          <!-- Parking Lot Mini Bucket -->
+          <div class="bg-slate-900/80 rounded-xl p-3 border border-amber-500/20">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-parking text-[10px]"></i> Parking Lot
+              </span>
+              <span id="countParking" class="text-xs font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400">0</span>
+            </div>
+            <div id="miniBucketParking" class="space-y-2 text-xs"></div>
+          </div>
+
+          <!-- Discarded Mini Bucket -->
+          <div class="bg-slate-900/80 rounded-xl p-3 border border-rose-500/20">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-ban text-[10px]"></i> Discarded
+              </span>
+              <span id="countDiscarded" class="text-xs font-mono px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400">0</span>
+            </div>
+            <div id="miniBucketDiscarded" class="space-y-2 text-xs"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 2: LIVE STATE BOARD (Full Kanban View) -->
+    <section id="view-board" class="tab-view h-full p-6 overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100">Live Implementation Decision Board</h2>
+          <p class="text-xs text-slate-400">Manage, edit, and move items across Locked In, Parking Lot, and Discarded buckets</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <!-- Phase filter -->
+          <select id="phaseFilter" class="bg-slate-800 border border-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5">
+            <option value="all">All Milestone Phases</option>
+            <option value="1">Phase 1 (Core)</option>
+            <option value="2">Phase 2 (Features)</option>
+            <option value="3">Phase 3 (Polishing)</option>
+          </select>
+          <button id="btnAddStateItem" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-lg transition flex items-center gap-1.5">
+            <i class="fa-solid fa-plus"></i> Add Item
+          </button>
+        </div>
+      </div>
+
+      <!-- Kanban Grid -->
+      <div class="flex-1 grid grid-cols-3 gap-6 overflow-hidden">
+        <!-- Locked In Column -->
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex flex-col overflow-hidden">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50"></span>
+              <h3 class="font-bold text-sm text-slate-200">Locked In</h3>
+            </div>
+            <span id="fullCountLocked" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold">0</span>
+          </div>
+          <div id="fullBucketLocked" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+        </div>
+
+        <!-- Parking Lot Column -->
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex flex-col overflow-hidden">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-amber-500 shadow-md shadow-amber-500/50"></span>
+              <h3 class="font-bold text-sm text-slate-200">Parking Lot</h3>
+            </div>
+            <span id="fullCountParking" class="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">0</span>
+          </div>
+          <div id="fullBucketParking" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+        </div>
+
+        <!-- Discarded Column -->
+        <div class="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 flex flex-col overflow-hidden">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
+            <div class="flex items-center gap-2">
+              <span class="w-3 h-3 rounded-full bg-rose-500 shadow-md shadow-rose-500/50"></span>
+              <h3 class="font-bold text-sm text-slate-200">Discarded</h3>
+            </div>
+            <span id="fullCountDiscarded" class="text-xs font-mono px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 font-semibold">0</span>
+          </div>
+          <div id="fullBucketDiscarded" class="flex-1 overflow-y-auto space-y-3 pr-1"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: GLOBAL SOURCE OF TRUTH VAULT -->
+    <section id="view-vault" class="tab-view h-full p-6 overflow-y-auto">
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100">Global Source of Truth Vault</h2>
+          <p class="text-xs text-slate-400">Standalone asset vault for logos, mascots, UI kits, and schematics with immutable governance rules</p>
+        </div>
+        <button id="btnUploadAsset" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition flex items-center gap-2 shadow-lg shadow-emerald-600/20">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload New Asset
+        </button>
+      </div>
+
+      <!-- Assets Grid -->
+      <div id="assetsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- VIEW 4: GITHUB SCANNER & REVERSE ENGINEERING -->
+    <section id="view-scanner" class="tab-view h-full p-6 overflow-y-auto">
+      <div class="max-w-4xl mx-auto space-y-6">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100">GitHub Repository Scanner</h2>
+          <p class="text-xs text-slate-400">Scan existing repositories to reverse-engineer technical stack and auto-generate implementation baseline</p>
+        </div>
+
+        <!-- Scanner Controls Box -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="md:col-span-2">
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Target Repository (owner/repo)</label>
+              <input type="text" id="scanRepoInput" placeholder="e.g. facebook/react or expressjs/express" 
+                     class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Target Branch</label>
+              <input type="text" id="scanBranchInput" value="main" placeholder="main" 
+                     class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-purple-500 focus:outline-none">
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between pt-2">
+            <p class="text-xs text-slate-500">Optional: Set GITHUB_TOKEN in settings to scan private repos and sync issues</p>
+            <button id="btnRunScan" class="px-5 py-2.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold rounded-xl shadow-lg shadow-purple-600/20 transition flex items-center gap-2">
+              <i class="fa-solid fa-magnifying-glass"></i> Scan & Reverse Engineer
+            </button>
+          </div>
+        </div>
+
+        <!-- Scan Results Output -->
+        <div id="scanResultsContainer" class="hidden bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+            <h3 class="font-bold text-base text-slate-200 flex items-center gap-2">
+              <i class="fa-solid fa-square-poll-vertical text-purple-400"></i> Discovered Architectural Baseline
+            </h3>
+            <button id="btnSyncGithubIssues" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-purple-300 text-xs font-semibold rounded-lg border border-purple-500/30 transition flex items-center gap-1.5">
+              <i class="fa-brands fa-github"></i> Sync Milestones to GitHub Issues
+            </button>
+          </div>
+
+          <div id="scanSummaryBox" class="text-xs text-slate-300 bg-slate-950 p-4 rounded-xl border border-slate-800"></div>
+
+          <div>
+            <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Extracted Locked-In Decisions</h4>
+            <div id="scanExtractedItems" class="space-y-2"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: MULTI-FORMAT EXPORTER -->
+    <section id="view-exporter" class="tab-view h-full p-6 overflow-hidden flex flex-col">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-xl font-bold text-slate-100">Multi-Format Spec Exporter</h2>
+          <p class="text-xs text-slate-400">Tailor outputs for Software Codebases, Physical Fabrication Specs, or General Charters</p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button id="btnDownloadMarkdown" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold rounded-xl transition flex items-center gap-1.5 shadow-lg shadow-cyan-600/20">
+            <i class="fa-solid fa-download"></i> Download Markdown (.md)
+          </button>
+          <button id="btnDownloadJSON" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-code"></i> Export JSON
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Spec Markdown Preview Window -->
+      <div class="flex-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 overflow-y-auto font-mono text-sm leading-relaxed text-slate-200" id="exportMarkdownPreview">
+        <div class="text-slate-500 text-center py-12">Select a project to generate and preview its implementation spec.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: NEW PROJECT -->
+  <div id="modalNewProject" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-slate-100">Create New Project</h3>
+        <button class="close-modal text-slate-400 hover:text-slate-200 text-lg">&times;</button>
+      </div>
+      <form id="formNewProject" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Project Title *</label>
+          <input type="text" id="newProjectTitle" required placeholder="e.g. PlanSmith Studio or CyberDeck 3D" 
+                 class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Project Type *</label>
+          <select id="newProjectType" class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="software">Software (Codebase / Web / App)</option>
+            <option value="physical">Physical Fabrication (3D Print / Laser / CNC)</option>
+            <option value="event">General / Event / Operations</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Description</label>
+          <textarea id="newProjectDesc" rows="2" placeholder="Brief project summary..." 
+                    class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">GitHub Repo (Optional)</label>
+          <input type="text" id="newProjectRepo" placeholder="e.g. owner/repo" 
+                 class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="close-modal px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/20">Create Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: UPLOAD VAULT ASSET -->
+  <div id="modalUploadAsset" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-slate-100">Upload Global Vault Asset</h3>
+        <button class="close-modal text-slate-400 hover:text-slate-200 text-lg">&times;</button>
+      </div>
+      <form id="formUploadAsset" class="space-y-4" enctype="multipart/form-data">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Asset File *</label>
+          <input type="file" id="assetFileInput" required 
+                 class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl p-2 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Asset Name</label>
+          <input type="text" id="assetNameInput" placeholder="e.g. Company Master Logo" 
+                 class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Asset Category</label>
+          <select id="assetTypeInput" class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+            <option value="logo">Logo / Branding</option>
+            <option value="mascot">Mascot / Character</option>
+            <option value="ui_kit">UI Kit / Design System</option>
+            <option value="reference">Schematic / Reference Spec</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Governance & Mutability Rules (JSON or traits)</label>
+          <textarea id="assetRulesInput" rows="3" placeholder='e.g. {"immutable": true, "mandatory_traits": ["must wear glasses"], "negative_constraints": ["no gradient backgrounds"]}' 
+                    class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs font-mono rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="close-modal px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-emerald-600/20">Upload Asset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD DECISION STATE ITEM -->
+  <div id="modalAddStateItem" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-base text-slate-100">Add Decision Board Item</h3>
+        <button class="close-modal text-slate-400 hover:text-slate-200 text-lg">&times;</button>
+      </div>
+      <form id="formAddStateItem" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Bucket Target *</label>
+          <select id="stateBucketInput" class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="locked">🔒 Locked In (Confirmed Decision)</option>
+            <option value="parking_lot">⏳ Parking Lot (Pending / Backlog)</option>
+            <option value="discarded">🚫 Discarded (Rejected / Out of Scope)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">Decision Content *</label>
+          <textarea id="stateContentInput" required rows="3" placeholder="e.g. Use Express.js with SQLite3 for local persistence" 
+                    class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm rounded-xl px-3.5 py-2.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none"></textarea>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Category</label>
+            <input type="text" id="stateCategoryInput" placeholder="e.g. architecture" 
+                   class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Milestone Phase</label>
+            <input type="number" id="statePhaseInput" value="1" min="1" max="10" 
+                   class="w-full bg-slate-950 border border-slate-700 text-slate-200 text-xs rounded-xl px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <button type="button" class="close-modal px-4 py-2 bg-slate-800 text-slate-300 text-xs font-semibold rounded-xl hover:bg-slate-700">Cancel</button>
+          <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/20">Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION CONTAINER -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 z-50 space-y-2 pointer-events-none"></div>
+
+  <!-- JS SCRIPTS -->
+  <script src="/js/app.js"></script>
+  <script src="/js/chat.js"></script>
+  <script src="/js/board.js"></script>
+  <script src="/js/gallery.js"></script>
+  <script src="/js/scanner.js"></script>
+  <script src="/js/exporter.js"></script>
+  <script src="http://127.0.0.1:8000/static/geppy-key-bridge.js" defer></script>
+</body>
+</html>
